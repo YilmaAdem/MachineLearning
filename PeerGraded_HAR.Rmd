@@ -1,0 +1,88 @@
+---
+
+---
+Machine Learning - Peer Graded Assignment 
+Yilma Adem
+Date: July 15, 2017
+----
+## Summary
+The goal of this project is to predict the model using pml training and test dataset. The dataset is sourced from  'Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements' by 6 researchers. Based on this source  a dataset is  with 5 classes (sitting-down, standing-up, standing, walking, and sitting) collected on 8 hours of activities of 4 healthy subjects. The dataset collected from devices such as Jawbone Up, Nike FuelBand, and Fitbit which relatively inexpensive. Complete history about HAR and the datasets can found http://groupware.les.inf.puc-rio.br/har.
+
+Decision Tree and Randomforest have chosen to do model fitting and predictive analysis. However, based on accurancy rate, Randomforest  model is found to be good. The cons for randomforest is speed and amount memory needs.
+
+## Packages
+```{r echo= TRUE}
+suppressMessages(library(caret))
+suppressMessages(library(ggplot2))
+suppressMessages(library(randomForest))
+suppressMessages(library(rpart))
+suppressMessages(library(Hmisc))
+set.seed(12345)
+```
+
+### Data Loading , preparating and Exploring
+
+```{r echo=TRUE}
+dataTraining <-read.csv("pml-training.csv", na.strings = "")
+dataTesting <- read.csv("pml-testing.csv", na.strings = "NA")
+# creating a partition with the training dataset
+inTrain <- createDataPartition(dataTraining$classe, p=0.7, list=FALSE)
+training <- dataTraining[inTrain,]
+testing <- dataTesting[-inTrain,]
+dim(training);dim(testing)
+
+## The dataset has  observation and 160 variables. There are substantial number of NAs near zero variables. So, removing these variables benifical to the model fiting and predictions.
+
+Zeros <- nearZeroVar(training)
+training <- training[, -Zeros]
+testing <- testing[, -Zeros]
+dim(training);dim(testing)
+
+#removing NAs
+NAs <-sapply(training, function(x) mean(is.na(x))) > 0.946
+training <- training[, NAs==FALSE]
+testing <- testing[,  NAs==FALSE]
+
+#remove variables in columns 1 to 5
+training <- training[, -(1:5)]
+testing<- testing[, -(1:5)]
+dim(training);dim(testing)
+# Correlation among variables using plot.
+qplot(total_accel_dumbbell, gyros_belt_y,  colour = classe, data=training)
+```
+
+###Model Fitting and Predicting using Decission Tree 
+
+```{r echo=TRUE}
+# Model fitting with Decission Tree
+modFitDT <- rpart(classe ~.,data=training, method="class")
+
+# Predicting 
+PredictDT  <- predict(modFitDT, newdata=testing)
+PredictDT
+# Decision Tree accuracy is 0.74
+```
+### Model fitting and predicting  with Randomforest 
+```{r echo=TRUE}
+#To make parallel processing since randomforest using up memory and time
+suppressMessages(library(doParallel))
+#Find out how many cores are available
+ cores<-detectCores()
+ cl <- makeCluster(cores[1]-1)
+#Register cluster
+registerDoParallel(cl)
+# Model Fitting using Random Forest
+ set.seed(12345)
+ conrf <- trainControl(method = "CV", number = 3, verboseIter = FALSE)
+ modFitrf <- train(classe ~ ., method = "rf", data = training, trControl = conrf)
+ modFitrf$finalModel
+ 
+ # predicting using Random Forest with 8 observations of testing dataset
+ Predrf <- predict(modFitrf, newdata = testing)
+ Predrf
+ # Predication accuracy  
+  ## Randomforest accuracy is 0.99
+
+```
+###Conclusion
+ With  accuracy 0.99 , Random forest regression model will be applied to predict the testing dataset.
